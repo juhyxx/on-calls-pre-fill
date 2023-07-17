@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>On-call Form Pre-filler</title>
+    <meta charset="utf-8" />
+    <script src="https://apis.google.com/js/api.js"></script>
+    <script src="https://accounts.google.com/gsi/client"></script>
+    <script src="https://momentjs.com/downloads/moment-with-locales.min.js"></script>
+    <script src="https://momentjs.com/downloads/moment-timezone-with-data.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment-range/4.0.2/moment-range.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/bambusekd/moment-holidays-cs@master/moment-holidays-cs.js"></script>
+    <script src="https://www.gstatic.com/charts/loader.js"></script>
+  </head>
+  <body>
+    <h1>On-call Form Pre-filler</h1>
+
+    <!--Add buttons to initiate auth sequence and sign out-->
+    <button id="authorize_button" onclick="handleAuthClick()" style="padding: 10px;font-size: large;">Click On Me 😈</button>
+    <label for="month_input" style="padding-left: 80px;font-size: large;">Select month</label>
+    <input id="month_input" type="month" onchange="handleMonthChange(this.value)" style="padding: 10px;font-size: large;" />
+    <label for="team" style="padding-left: 80px;font-size: large;">Choose team:</label>
+    <select name="team" id="team" style="padding-left: 10px;font-size: large;">
+      <option value="One Account" selected>One Account</option>
+      <!-- <option value="Care">Care</option> -->
+    </select>
+
+    <div id="content" style="padding: 10px;"></div>
+
+    <script type="text/javascript">
+      /* exported gapiLoaded */
+      /* exported gisLoaded */
+      /* exported handleAuthClick */
+      /* exported handleSignoutClick */
+
+      // TODO(developer): Set to client ID and API key from the Developer Console
+      const CLIENT_ID = '162262122869-l40v4brp6b9t4vl7317n36gimon5og3a.apps.googleusercontent.com';
+      const API_KEY = 'AIzaSyAuFK5BeOHSwDSqXH-gAqeP_7Nk7kMq_ys';
+
+      // Discovery doc URL for APIs used by the quickstart
+      const DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest';
+
+      // Authorization scopes required by the API; multiple scopes can be
+      // included, separated by spaces.
+      const SCOPES = 'https://www.googleapis.com/auth/calendar.readonly';
+
+      let tokenClient;
+      let gapiInited = false;
+      let gisInited = false;
+
+      window['moment-range'].extendMoment(moment);
+
+      document.getElementById("month_input").value = moment(new Date()).format('YYYY-MM');
+
+      gapi.load('client', initializeGapiClient);
+      gisLoaded();
+
+      /**
+       * Callback after the API client is loaded. Loads the
+       * discovery doc to initialize the API.
+       */
+      async function initializeGapiClient() {
+        await gapi.client.init({
+          apiKey: API_KEY,
+          discoveryDocs: [DISCOVERY_DOC],
+        });
+        gapiInited = true;
+      }
+
+      /**
+       * Callback after Google Identity Services are loaded.
+       */
+      function gisLoaded() {
+        tokenClient = google.accounts.oauth2.initTokenClient({
+          client_id: CLIENT_ID,
+          scope: SCOPES,
+          callback: '', // defined later
+        });
+        gisInited = true;
+      }
+
+
+      /**
+       *  Sign in the user upon button click.
+       */
+      function handleAuthClick() {
+        tokenClient.callback = async (resp) => {
+          if (resp.error !== undefined) {
+            throw (resp);
+          }
+          document.getElementById('authorize_button').innerText = 'Refresh';
+          const month = document.getElementById("month_input").value
+          await renderOnCallsHoursPerDeveloper(month);
+        };
+
+        if (gapi.client.getToken() === null) {
+          // Prompt the user to select a Google Account and ask for consent to share their data
+          // when establishing a new session.
+          tokenClient.requestAccessToken({prompt: 'consent'});
+        } else {
+          // Skip display of account chooser and consent dialog for an existing session.
+          tokenClient.requestAccessToken({prompt: ''});
+        }
+      }
+
+      /**
+       *  Change month
+       */
+      function handleMonthChange(month) {
+        console.log("handleMonthChange", month);
+        renderOnCallsHoursPerDeveloper(month);
+      }
+
+      async function createEvents(month) {
+        let response;
+        try {
+          const request = {
+            'calendarId': 'iudsi92n9lj7falv973v2kirn5t7qd6t@import.calendar.google.com',
+            // 'timeMin': moment(month).subtract(1,'months').toISOString(),
+            'timeMin': moment(month).toISOString(),
+            'showDeleted': false,
+            'singleEvents': true,
+            // 'maxResults': 10,
+            'orderBy': 'startTime',
+          };
+          response = await gapi.client.calendar.events.list(request);
+        } catch (err) {
+          document.getElementById('content').innerText = err.message;
+          return;
+        }
+
+        const events = response.result.items;
+        if (!events || events.length == 0) {
+          document.getElementById('content').innerText = 'No events found.';
+          return;
+        }
+
+        console.log('bujaga events', events);
+
+        return events;
+      }
+
+      function createDevelopersEventsMap(events) {
+        const developersEventsMap = events.reduce((groups, item) => {
+          const { summary } = item;
+          const startIndex = summary.indexOf('(');
+          const endIndex = summary.indexOf(')');
+          if (startIndex !== -1 && endIndex !== -1) {
+            const name = summary.substring(0, startIndex).trim();
+            if (!groups[name]) {
+              groups[name] = [];
+            }
+            groups[name].push(item);
+          }
+          return groups;
+        }, {});
+        return developersEventsMap;        
+      }
+
+      function roundToTwoDecimalPlaces(number) {
+        return Math.round(number * 100) / 100;
+      }
+
+      function roundTo(number) {
+        return Math.round(number);
+      }
+
+      function generateColorName(inputString) {
+        const colorNames = [
+          "aliceblue", "azure", "beige", "cornsilk", "floralwhite",
+          "gainsboro", "ghostwhite", "honeydew", "ivory", "lavender",
+          "lavenderblush", "lemonchiffon", "lightcyan", "lightgoldenrodyellow", "lightgray",
+          "lightpink", "lightsalmon", "lightseagreen", "lightskyblue", "lightslategray"
+        ];
+
+        let hash = 0;
+
+        for (let i = 0; i < inputString.length; i++) {
+          hash = inputString.charCodeAt(i) + ((hash << 4) - hash);
+        }
+
+        const index = Math.abs(hash) % colorNames.length;
+        return colorNames[index];
+      }
+
+      function isWeekendOrHoliday(momentDate) {
+        if (momentDate.weekday() === 6 || momentDate.weekday() === 0) return true;
+        if (momentDate.isHoliday()) return true;
+        return false;
+      }
+
+      function* generateMoments(start, end) {
+        const interval = moment.duration({ days: 1});
+        const currentDay = moment.tz(start, start.timeZone);
+
+        while (currentDay.isBefore(end)) {
+          const workingHoursStart = isWeekendOrHoliday(currentDay) ? moment.tz(currentDay, currentDay.timeZone).hour(0).minute(0).second(0) : moment.tz(currentDay, currentDay.timeZone).hour(8).minute(0).second(0);
+          const workingHoursEnd = isWeekendOrHoliday(currentDay) ? moment.tz(currentDay, currentDay.timeZone).hour(0).minute(0).second(0) : moment.tz(currentDay, currentDay.timeZone).hour(16).minute(0).second(0);
+
+          const workingHoursRange = moment.range(workingHoursStart, workingHoursEnd);
+          const hoursRange = moment.range(currentDay.clone().startOf('day'), currentDay.clone().endOf('day'));
+          const offHoursRange = hoursRange.subtract(workingHoursRange)
+
+          const allOnCallHoursInCurrentDay = moment.range(currentDay, moment.min(end, currentDay.clone().endOf('day')));
+
+          const eventStartOutsideWorkingHours = moment.max(currentDay, workingHoursEnd);
+          const eventEndOutsideWorkingHours = moment.min(currentDay, workingHoursStart);
+
+          const event = {
+            start: eventStartOutsideWorkingHours.format(),
+            end: eventEndOutsideWorkingHours.format(),
+            duration: offHoursRange.map((offHoursPart) => (allOnCallHoursInCurrentDay.intersect(offHoursPart))).filter(Boolean).reduce((acc, range) => (acc + range.duration('hours', true)), 0)
+          }
+
+          currentDay.add(moment.duration(currentDay.clone().endOf('day').diff(currentDay)).valueOf() + 1, 'milliseconds');
+          yield {
+            ...event,
+          };
+        }
+      }
+
+      async function renderOnCallsHoursPerDeveloper(month) {
+        // clear content
+        document.getElementById('content').innerHTML = '';
+        const events = await createEvents(month);
+        console.log('render for month: ', month);
+
+        const countOnCallHours = (calEvents, month) => {
+          // Initialize a variable to store the total duration
+          let totalDurationOutsideWorkingHours = 0;
+
+          // Define the target month using Moment.js
+          const targetMonth = moment(month); // Replace '2023-06' with your desired target month
+
+          const onCallsByDay = [];
+
+          // Iterate over each event
+          for (const event of calEvents) {
+            // const eventStart = moment(event.start.dateTime);
+            // const eventEnd = moment(event.end.dateTime);
+
+            const eventStart = moment.tz(event.start.dateTime, event.start.timeZone);
+            const eventEnd = moment.tz(event.end.dateTime, event.end.timeZone);
+
+            if (!eventEnd.isSameOrAfter(targetMonth.clone().startOf('month')) || !eventStart.isBefore(targetMonth.clone().endOf('month')))
+              continue;
+
+            // Calculate the start and end moments for the event within the target month
+            const eventStartWithinMonth = moment.max(eventStart, targetMonth.clone().startOf('month'));
+            const eventEndWithinMonth = moment.min(eventEnd, targetMonth.clone().endOf('month'));
+
+            // Calculate the duration of the event within the target month
+            const eventDurationWithinMonth = eventEndWithinMonth.diff(eventStartWithinMonth, 'hours');
+
+            const normalizedEvent = {
+              start: eventStartWithinMonth,
+              end: eventEndWithinMonth,
+            }
+
+            onCallsByDay.push(Array.from(generateMoments(eventStartWithinMonth, eventEndWithinMonth)))
+            totalDurationOutsideWorkingHours = onCallsByDay.flat().reduce((acc, {duration}) => (acc + duration), 0);
+
+          }
+
+          // The total duration of all events outside working hours
+          console.log(`Total duration of all events outside working hours: ${totalDurationOutsideWorkingHours} hours`);
+          
+          return {
+            totalDurationOutsideWorkingHours,
+            onCallsByDay,
+          }
+        }
+
+        // Grouping the array by the name extracted from the 'summary' field
+        const developersEvents = Object.entries(createDevelopersEventsMap(events))
+          .map(([devName, devEvents]) => {
+            const {totalDurationOutsideWorkingHours, onCallsByDay} = countOnCallHours(devEvents, month);
+          
+            console.log(devName, totalDurationOutsideWorkingHours, onCallsByDay);
+            
+            return {
+              devName,
+              devEvents,
+              onCallsByDay,
+              totalDurationOutsideWorkingHours
+            }
+          });
+
+        const sumAllDevsOnCallsHours = developersEvents.reduce((acc, {totalDurationOutsideWorkingHours}) => (acc + totalDurationOutsideWorkingHours), 0);
+
+        developersEvents.forEach(({devName, devEvents, onCallsByDay, totalDurationOutsideWorkingHours}) => {
+          const newDevDiv = document.createElement("div");
+          newDevDiv.style.backgroundColor = generateColorName(devName);
+          newDevDiv.style.padding = '20px';
+          newDevDiv.style.fontFamily = 'monospace';
+          newDevDiv.innerText += `${devName}: ${formatTotalHours(roundToTwoDecimalPlaces(totalDurationOutsideWorkingHours))} hours \n`;
+
+          const newAHref = document.createElement("a");
+          newAHref.href = generateGoogleFormLink({
+            sumAllDevsOnCallsHours: roundTo(sumAllDevsOnCallsHours),
+            totalDurationOutsideWorkingHours: roundToTwoDecimalPlaces(totalDurationOutsideWorkingHours),
+            month: moment(month).format('MMMM'),
+            team: document.getElementById('team').value
+          });
+          newAHref.text = `Prefill google form - ${devName}`;
+          newAHref.target = "_blank";
+
+          newDevDiv.appendChild(newAHref);
+          document.getElementById('content').prepend(newDevDiv);
+
+          drawChart(devName, onCallsByDay, roundToTwoDecimalPlaces(totalDurationOutsideWorkingHours));
+        });
+
+        console.log('group', developersEvents);
+
+        const newDevDiv = document.createElement("div");
+        newDevDiv.style.padding = '20px';
+        newDevDiv.style.fontFamily = 'monospace';
+        newDevDiv.style.fontWeight = 'bold';
+        newDevDiv.innerText = `sumAllDevsOnCallsHours: ${roundTo(sumAllDevsOnCallsHours)} hours \n`;
+        document.getElementById('content').prepend(newDevDiv);
+      }
+
+      // ================================= Google Calendar visualization =================================
+      
+      google.charts.load("current", {packages:["calendar"]});
+      google.charts.setOnLoadCallback(() => console.log('charts package loaded..'));
+
+      function generateGoogleFormLink({
+        sumAllDevsOnCallsHours,
+        totalDurationOutsideWorkingHours,
+        month = moment(inputMonth).format("MMMM"),
+        team,
+        country = 'CZ',
+      }) {
+        const fields = {
+          "entry.603754990": `${country}`, //Your country of residence
+          "entry.87452438": `${team}`, //Select your team
+          "entry.1709272489": `${month}`, //Select month
+          "entry.807818939": `${sumAllDevsOnCallsHours}`, //How many on-call hours did YOUR TEAM have in total during the selected month?
+          "entry.985563116": `${totalDurationOutsideWorkingHours}`, //How many on-call hours did YOU have in total during the selected month?
+        }
+
+        const queryParams = new URLSearchParams(fields)
+
+        return `https://docs.google.com/forms/d/e/1FAIpQLSdKzPayF1yIgeCv3uyQTWyuIAemy6SlUntK4Mjhglb3rMkwYw/viewform?${queryParams.toString()}`
+      };
+
+      function formatTotalHours(totalDurationOutsideWorkingHours) {
+        return moment.duration(totalDurationOutsideWorkingHours, 'hours').asHours().toFixed(2);
+      }
+
+
+      function drawChart(devName, onCallsByDay, totalDurationOutsideWorkingHours) {
+          var dataTable = new google.visualization.DataTable();
+          dataTable.addColumn({ type: 'datetime', id: 'Date', label: 'On-call start' });
+          dataTable.addColumn({ type: 'number', id: 'Hours in On-call', label: 'Hours in On-call' });
+
+          const rows = onCallsByDay.flat().map((event) => [
+            new Date(event.start), event.duration
+          ])
+
+          dataTable.addRows(rows);
+
+          const newChart = document.createElement("div")
+          newChart.style.paddingTop = '10px';
+          document.getElementById('content').append(newChart);
+
+          var chart = new google.visualization.Calendar(newChart);
+
+          var options = {
+            title: `${devName}: ${formatTotalHours(totalDurationOutsideWorkingHours)}`,
+            height: 250,
+            calendar: {
+              cellColor: {
+                stroke: '#76a7fa',
+                strokeOpacity: 0.5,
+                strokeWidth: 1,
+              },
+              focusedCellColor: {
+                stroke: '#ff0000',
+                strokeOpacity: 1,
+                strokeWidth: 1,
+              }
+            }
+          };
+
+          chart.draw(dataTable, options);
+      }
+    </script>
+
+  </body>
+</html>
