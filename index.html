@@ -116,7 +116,7 @@
           const request = {
             'calendarId': 'iudsi92n9lj7falv973v2kirn5t7qd6t@import.calendar.google.com',
             // 'timeMin': moment(month).subtract(1,'months').toISOString(),
-            'timeMin': moment(month).toISOString(),
+            'timeMin': moment("2023-07").tz("Europe/Prague").format(),
             'showDeleted': false,
             'singleEvents': true,
             // 'maxResults': 10,
@@ -136,7 +136,23 @@
 
         console.log('bujaga events', events);
 
-        return events;
+        return preProcessEvents(events);
+      }
+
+      function preProcessEvents(events) {
+        const eventik = events[0].start.dateTime;
+
+        return events.map((event) => ({
+          ...event,
+          start: {
+            dateTime: moment(event.start.dateTime).tz('UTC').add(2, 'hours').format(),
+            timeZone: 'UTC'
+          },
+          end: {
+            dateTime: moment(event.end.dateTime).tz('UTC').add(2, 'hours').format(),
+            timeZone: 'UTC'
+          },          
+        }));
       }
 
       function createDevelopersEventsMap(events) {
@@ -156,8 +172,8 @@
         return developersEventsMap;        
       }
 
-      function roundToTwoDecimalPlaces(number) {
-        return Math.round(number * 100) / 100;
+      function roundToThreeDecimalPlaces(number) {
+        return Math.round(number * 1000) / 1000;
       }
 
       function roundTo(number) {
@@ -190,11 +206,11 @@
 
       function* generateMoments(start, end) {
         const interval = moment.duration({ days: 1});
-        const currentDay = moment.tz(start, start.timeZone);
+        const currentDay = moment.tz(start, start.tz());
 
         while (currentDay.isBefore(end)) {
-          const workingHoursStart = isWeekendOrHoliday(currentDay) ? moment.tz(currentDay, currentDay.timeZone).hour(0).minute(0).second(0) : moment.tz(currentDay, currentDay.timeZone).hour(8).minute(0).second(0);
-          const workingHoursEnd = isWeekendOrHoliday(currentDay) ? moment.tz(currentDay, currentDay.timeZone).hour(0).minute(0).second(0) : moment.tz(currentDay, currentDay.timeZone).hour(16).minute(0).second(0);
+          const workingHoursStart = isWeekendOrHoliday(currentDay) ? moment.tz(currentDay, currentDay.tz()).hour(0).minute(0).second(0) : moment.tz(currentDay, currentDay.tz()).hour(8).minute(0).second(0);
+          const workingHoursEnd = isWeekendOrHoliday(currentDay) ? moment.tz(currentDay, currentDay.tz()).hour(0).minute(0).second(0) : moment.tz(currentDay, currentDay.tz()).hour(16).minute(0).second(0);
 
           const workingHoursRange = moment.range(workingHoursStart, workingHoursEnd);
           const hoursRange = moment.range(currentDay.clone().startOf('day'), currentDay.clone().endOf('day'));
@@ -229,7 +245,7 @@
           let totalDurationOutsideWorkingHours = 0;
 
           // Define the target month using Moment.js
-          const targetMonth = moment(month); // Replace '2023-06' with your desired target month
+          const targetMonth = moment.tz(month, 'UTC'); // Replace '2023-06' with your desired target month
 
           const onCallsByDay = [];
 
@@ -292,12 +308,12 @@
           newDevDiv.style.backgroundColor = generateColorName(devName);
           newDevDiv.style.padding = '20px';
           newDevDiv.style.fontFamily = 'monospace';
-          newDevDiv.innerText += `${devName}: ${formatTotalHours(roundToTwoDecimalPlaces(totalDurationOutsideWorkingHours))} hours \n`;
+          newDevDiv.innerText += `${devName}: ${formatTotalHours(roundToThreeDecimalPlaces(totalDurationOutsideWorkingHours))} hours \n`;
 
           const newAHref = document.createElement("a");
           newAHref.href = generateGoogleFormLink({
             sumAllDevsOnCallsHours: roundTo(sumAllDevsOnCallsHours),
-            totalDurationOutsideWorkingHours: roundToTwoDecimalPlaces(totalDurationOutsideWorkingHours),
+            totalDurationOutsideWorkingHours: roundToThreeDecimalPlaces(totalDurationOutsideWorkingHours),
             month: moment(month).format('MMMM'),
             team: document.getElementById('team').value
           });
@@ -307,7 +323,7 @@
           newDevDiv.appendChild(newAHref);
           document.getElementById('content').prepend(newDevDiv);
 
-          drawChart(devName, onCallsByDay, roundToTwoDecimalPlaces(totalDurationOutsideWorkingHours));
+          drawChart(devName, onCallsByDay, roundToThreeDecimalPlaces(totalDurationOutsideWorkingHours));
         });
 
         console.log('group', developersEvents);
@@ -346,7 +362,7 @@
       };
 
       function formatTotalHours(totalDurationOutsideWorkingHours) {
-        return moment.duration(totalDurationOutsideWorkingHours, 'hours').asHours().toFixed(2);
+        return moment.duration(totalDurationOutsideWorkingHours, 'hours').asHours().toFixed(3);
       }
 
 
