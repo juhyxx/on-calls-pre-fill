@@ -32,7 +32,7 @@ This is very easy. Just open https://on-calls-pre-fill.pages.dev/
 
 <br />
 
-![Showcase](assets/on-calls-prefiller.mp4)
+![Showcase](assets/on-calls-prefiller.gif)
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 
@@ -57,7 +57,7 @@ Example:
           },
 ```
 
-![How to setup calendar](assets/schedule-to-calendar-id.mp4)
+![How to setup calendar](assets/schedule-to-calendar-id.gif)
 
 ### Built and Deploy
 
