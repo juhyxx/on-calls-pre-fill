@@ -1,0 +1,9 @@
+#Create docker-compose.yml file configuration with nginx which will serve index.html file from the volume
+version: '3'
+services:
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./index.html:/usr/share/nginx/html/index.html

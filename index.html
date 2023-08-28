@@ -10,6 +10,28 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/moment-range/4.0.2/moment-range.js"></script>
     <script src="https://cdn.jsdelivr.net/gh/bambusekd/moment-holidays-cs@master/moment-holidays-cs.js"></script>
     <script src="https://www.gstatic.com/charts/loader.js"></script>
+    <script type="text/javascript">
+      window.CONFIG = {
+        TEAMS: {
+          ONE_ACCOUNT: {
+            TITLE: 'One Account',
+            CALENDAR_ID: '0hl5v5fdgv5vrqhntgj12qfag1hrr492@import.calendar.google.com',
+            COUNTRY: 'CZ',
+            WORKING_HOURS_START: 8, // This has to correspond with the working hours set in opsgenie
+            WORKING_HOURS_END: 16, // This has to correspond with the working hours set in opsgenie
+          },
+          PARTNER: {
+            TITLE: 'Partner',
+            CALENDAR_ID: '',
+            COUNTRY: 'CZ',
+            WORKING_HOURS_START: 8, // This has to correspond with the working hours set in opsgenie
+            WORKING_HOURS_END: 16, // This has to correspond with the working hours set in opsgenie
+          }
+        }
+      }
+
+      window.currentTeam = window.CONFIG.TEAMS.ONE_ACCOUNT;
+    </script> 
   </head>
   <body>
     <h1>On-call Form Pre-filler</h1>
@@ -19,8 +41,12 @@
     <label for="month_input" style="padding-left: 80px;font-size: large;">Select month</label>
     <input id="month_input" type="month" onchange="handleMonthChange(this.value)" style="padding: 10px;font-size: large;" />
     <label for="team" style="padding-left: 80px;font-size: large;">Choose team:</label>
-    <select name="team" id="team" style="padding-left: 10px;font-size: large;">
-      <option value="One Account" selected>One Account</option>
+    <select name="team" id="team" style="padding-left: 10px;font-size: large;" onchange="handleTeamChange(this)">
+      <script type="text/javascript">
+        Object.entries(window.CONFIG.TEAMS).forEach(([key, {TITLE}]) => {
+          document.write(`<option value="${key}">${TITLE}</option>`);
+        })
+      </script> 
       <!-- <option value="Care">Care</option> -->
     </select>
 
@@ -33,7 +59,7 @@
       /* exported handleSignoutClick */
 
       // TODO(developer): Set to client ID and API key from the Developer Console
-      const CLIENT_ID = '162262122869-l40v4brp6b9t4vl7317n36gimon5og3a.apps.googleusercontent.com';
+      const CLIENT_ID = '162262122869-l40v4brp6b9t4vl7317n36gimon5og3a.apps.googleusercontent.com';   // For details check https://console.cloud.google.com/apis/credentials/oauthclient/162262122869-l40v4brp6b9t4vl7317n36gimon5og3a.apps.googleusercontent.com?project=heu-one-account-dev
       const API_KEY = 'AIzaSyAuFK5BeOHSwDSqXH-gAqeP_7Nk7kMq_ys';
 
       // Discovery doc URL for APIs used by the quickstart
@@ -102,6 +128,11 @@
         }
       }
 
+      function handleTeamChange(team) {
+        console.log("handleTeamChange", window.CONFIG.TEAMS[team.value]);
+        window.currentTeam = window.CONFIG.TEAMS[team.value];
+      }
+
       /**
        *  Change month
        */
@@ -114,9 +145,8 @@
         let response;
         try {
           const request = {
-            'calendarId': 'iudsi92n9lj7falv973v2kirn5t7qd6t@import.calendar.google.com',
-            // 'timeMin': moment(month).subtract(1,'months').toISOString(),
-            'timeMin': moment("2023-07").tz("Europe/Prague").format(),
+            'calendarId': currentTeam.CALENDAR_ID,
+            'timeMin': moment(month).subtract(1,'months').tz("Europe/Prague").format(),
             'showDeleted': false,
             'singleEvents': true,
             // 'maxResults': 10,
@@ -140,8 +170,6 @@
       }
 
       function preProcessEvents(events) {
-        const eventik = events[0].start.dateTime;
-
         return events.map((event) => ({
           ...event,
           start: {
@@ -204,13 +232,14 @@
         return false;
       }
 
+      // =============================== Create events with on-call hours per day =========================
       function* generateMoments(start, end) {
         const interval = moment.duration({ days: 1});
         const currentDay = moment.tz(start, start.tz());
 
         while (currentDay.isBefore(end)) {
-          const workingHoursStart = isWeekendOrHoliday(currentDay) ? moment.tz(currentDay, currentDay.tz()).hour(0).minute(0).second(0) : moment.tz(currentDay, currentDay.tz()).hour(8).minute(0).second(0);
-          const workingHoursEnd = isWeekendOrHoliday(currentDay) ? moment.tz(currentDay, currentDay.tz()).hour(0).minute(0).second(0) : moment.tz(currentDay, currentDay.tz()).hour(16).minute(0).second(0);
+          const workingHoursStart = isWeekendOrHoliday(currentDay) ? moment.tz(currentDay, currentDay.tz()).hour(0).minute(0).second(0) : moment.tz(currentDay, currentDay.tz()).hour(currentTeam.WORKING_HOURS_START).minute(0).second(0);
+          const workingHoursEnd = isWeekendOrHoliday(currentDay) ? moment.tz(currentDay, currentDay.tz()).hour(0).minute(0).second(0) : moment.tz(currentDay, currentDay.tz()).hour(currentTeam.WORKING_HOURS_END).minute(0).second(0);
 
           const workingHoursRange = moment.range(workingHoursStart, workingHoursEnd);
           const hoursRange = moment.range(currentDay.clone().startOf('day'), currentDay.clone().endOf('day'));
@@ -233,6 +262,7 @@
           };
         }
       }
+      //===================================================================================================
 
       async function renderOnCallsHoursPerDeveloper(month) {
         // clear content
@@ -315,7 +345,8 @@
             sumAllDevsOnCallsHours: roundTo(sumAllDevsOnCallsHours),
             totalDurationOutsideWorkingHours: roundToThreeDecimalPlaces(totalDurationOutsideWorkingHours),
             month: moment(month).format('MMMM'),
-            team: document.getElementById('team').value
+            team: currentTeam.TITLE,
+            country: currentTeam.COUNTRY,
           });
           newAHref.text = `Prefill google form - ${devName}`;
           newAHref.target = "_blank";
@@ -346,7 +377,7 @@
         totalDurationOutsideWorkingHours,
         month = moment(inputMonth).format("MMMM"),
         team,
-        country = 'CZ',
+        country,
       }) {
         const fields = {
           "entry.603754990": `${country}`, //Your country of residence
