@@ -86,7 +86,7 @@ You can run this project locally (even if it doesn't make much sense :).
 
 1. Clone the repo
    ```sh
-   git clone https://github.com/lipelix/on-calls-pre-fill.git
+   git clone https://github.com/heureka/on-calls-pre-fill.git
 1. Enable Google Calendar API:
     - follow instructions on https://support.google.com/googleapi/answer/6158862?hl=en
     - in `Client ID` configuration add `http://127.0.0.1` to _Authorized JavaScript origins_ and to _Authorized redirect URIs_
