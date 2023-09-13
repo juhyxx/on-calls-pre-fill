@@ -110,3 +110,20 @@ You can run this project locally (even if it doesn't make much sense :).
 - [x] Enable google form pre-filing
 
 <p align="right">(<a href="#top">back to top</a>)</p>
+
+## FAQ
+
+> **I can't see my on-call hours from previous month, is it bug?**
+> 
+> It is how it works. You need to be quick and fill your hours before month ends.
+
+> **I want new feature, what should I do?**
+> 
+> Create new <a href="https://github.com/heureka/on-calls-pre-fill/issues">issue</a>
+
+> **I found bug, what should I do?**
+> 
+> Create new <a href="https://github.com/heureka/on-calls-pre-fill/issues">issue</a>.
+
+
+<p align="right">(<a href="#top">back to top</a>)</p>
