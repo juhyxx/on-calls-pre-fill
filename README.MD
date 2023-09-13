@@ -9,7 +9,7 @@
   <p align="center">
     Do not count your on-call hours manually again
     <br />
-    <a href="https://on-calls-pre-fill.pages.dev/"><strong>https://on-calls-pre-fill.pages.dev/</strong></a>
+    <a href="https://heureka.github.io/on-calls-pre-fill/"><strong>https://heureka.github.io/on-calls-pre-fill/</strong></a>
     <br />
     <br />
   </p>
@@ -28,7 +28,7 @@ Once per month developers who has been part of on-call rotation need to count th
 <!-- USAGE EXAMPLES -->
 ## Usage
 
-This is very easy. Just open https://on-calls-pre-fill.pages.dev/
+This is very easy. Just open https://heureka.github.io/on-calls-pre-fill/
 
 <br />
 
