@@ -46,6 +46,17 @@
 
       window.currentTeam = window.CONFIG.TEAMS.ONE_ACCOUNT;
     </script> 
+    <script type="text/javascript">
+    document.addEventListener("DOMContentLoaded", (event) => {
+        console.log("DOM fully loaded and parsed");
+        const params = window.location.search.substring(1).split("&").reduce((prev ,item) => {
+            const splitted = item.split("=");
+            prev[splitted[0]] = splitted[1];
+            return prev;
+        }, {})
+        document.querySelector("select#team").value = params["team"];
+    });
+    </script>
   </head>
   <body>
     <h1>On-call Form Pre-filler</h1>
