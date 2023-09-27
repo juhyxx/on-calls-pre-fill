@@ -54,7 +54,9 @@
             prev[splitted[0]] = splitted[1];
             return prev;
         }, {})
-        document.querySelector("select#team").value = params["team"];
+        if (params["team"]) {
+            document.querySelector("select#team").value = params["team"];
+        }
     });
     </script>
   </head>
